@@ -495,9 +495,13 @@ public class ChessBoard : MonoBehaviour
             {
                 for (int y = 0; y < TILE_COUNT_Y; y++)
                 {
-                    simulation[x, y] = chessPieces[x, y];//gán giá trị vị trí của từng quân vào biến simulation
-                    if (simulation[x, y].team != cp.team)
-                        simAttackingPiece.Add(simulation[x, y]);//thêm tất cả các mảnh đối phương vào bên trong mảng
+                    if (chessPieces[x, y] != null)
+                    {
+                        simulation[x, y] = chessPieces[x, y];//gán giá trị vị trí của từng quân vào biến simulation
+                        if (simulation[x, y].team != cp.team)
+                            simAttackingPiece.Add(simulation[x, y]);//thêm tất cả các mảnh đối phương vào bên trong mảng
+
+                    }
                 }
             }
 
@@ -537,6 +541,64 @@ public class ChessBoard : MonoBehaviour
         //loại bỏ khỏi danh sách availableMove hiện tại
         for (int i = 0; i < movesToRemove.Count; i++)
             moves.Remove(movesToRemove[i]);
+    }
+    private bool CheckForCheckMate()
+    {
+        Vector2Int[] lastMove = moveList[moveList.Count - 1];//lấy vị trí đến nc đi cuối cùng
+        int targetteam = (chessPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+
+        List<ChessPiece> attackingPieces = new List<ChessPiece>();
+        List<ChessPiece> defendingPieces = new List<ChessPiece>();
+        ChessPiece targetKing = null;
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                if (chessPieces[x, y] != null)
+                {
+                    if (chessPieces[x, y].team == targetteam)
+                    {
+                        defendingPieces.Add(chessPieces[x, y]);
+                        if (chessPieces[x, y].type == ChessPieceType.King)
+                        {
+                            targetKing = chessPieces[x, y];
+                        }
+                    }
+                    else
+                    {
+                        attackingPieces.Add(chessPieces[x, y]);
+                    }
+                }
+            }
+        }
+
+        //khi quân vua vị tấn công
+        List<Vector2Int> currentAvailableMoves = new List<Vector2Int>();
+        for (int i = 0; i < attackingPieces.Count; i++)
+        {
+            List<Vector2Int> pieceMove = attackingPieces[i].GetAvailableMoves(ref chessPieces, TILE_COUNT_X, TILE_COUNT_Y);
+            for (int b = 0; b < pieceMove.Count; b++)
+            {
+                currentAvailableMoves.Add(pieceMove[b]);
+            }
+        }
+        if(ContainsValidMove(ref currentAvailableMoves, new Vector2Int(targetKing.currentX, targetKing.currentY)))
+        {
+            //vua đang sắp bị bế, chúng ta sẽ phải move đi
+            for (int i = 0; i < defendingPieces.Count; i++)
+            {
+                List<Vector2Int> defendingMoves = defendingPieces[i].GetAvailableMoves(ref chessPieces, TILE_COUNT_X, TILE_COUNT_Y);
+                SimulateMoveForSinglePiece(defendingPieces[i], ref defendingMoves, targetKing);
+
+                if (defendingMoves.Count != 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
     }
 
     //Operations
@@ -615,6 +677,11 @@ public class ChessBoard : MonoBehaviour
         moveList.Add(new Vector2Int[] { previousPosition, new Vector2Int(x, y) });//previousPosition: vị trí trước đó của quân cờ. new Vector2Int(x,y): vị trí sau đó khi mà ng chơi đã di chuyển quân cờ đó.
 
         ProcessSpecialMove();//hàm để kiểm tra xem quân cờ có làm bước đi đặc biệt chưa. Nếu rồi thì chúng ta cần xử lý 1 cái gì đó
+
+        if (CheckForCheckMate())
+        {
+            CheckMate(cp.team);
+        }
 
         return true;
     }
